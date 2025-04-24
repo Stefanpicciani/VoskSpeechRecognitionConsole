@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "VoskSpeechRecognitionConsole": {
+      "commandName": "Project"
+    },
+    "Container (Dockerfile)": {
+      "commandName": "Docker"
+    }
+  }
+}

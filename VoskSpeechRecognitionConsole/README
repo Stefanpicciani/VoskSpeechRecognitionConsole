@@ -1,0 +1,82 @@
+﻿# Aplicativo Console para Teste de Reconhecimento de Fala com Vosk
+
+Este é um aplicativo de console simples para testar o reconhecimento de fala usando a biblioteca Vosk. O aplicativo captura áudio do microfone, processa-o usando um modelo Vosk e exibe o texto reconhecido.
+
+## Pré-requisitos
+
+- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
+- Um microfone funcional conectado ao seu computador
+- Modelo Vosk para o idioma desejado
+
+## Configuração
+
+### 1. Baixe um Modelo Vosk
+
+Você precisa baixar um modelo Vosk para o idioma que deseja reconhecer. Os modelos podem ser encontrados em [https://alphacephei.com/vosk/models](https://alphacephei.com/vosk/models).
+
+Aqui estão alguns modelos recomendados:
+
+- **Português (pequeno)**: [vosk-model-small-pt-0.3](https://alphacephei.com/vosk/models/vosk-model-small-pt-0.3.zip) (~31MB)
+- **Inglês (pequeno)**: [vosk-model-small-en-us-0.15](https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip) (~42MB)
+
+### 2. Extraia o Modelo
+
+Depois de baixar o modelo, siga estas etapas:
+
+1. Crie uma pasta chamada `model` no diretório do projeto (onde está o arquivo `.csproj`)
+2. Extraia o conteúdo do arquivo ZIP do modelo dentro desta pasta `model`
+
+O diretório deve ter uma estrutura semelhante a:
+
+```
+VoskSpeechRecognitionConsole/
+├── VoskSpeechRecognitionConsole.csproj
+├── Program.cs
+└── model/
+    ├── am/
+    ├── conf/
+    ├── ivector/
+    ├── ... (outros arquivos do modelo)
+```
+
+## Compilação e Execução
+
+1. Abra um terminal na pasta raiz do projeto
+2. Execute os seguintes comandos:
+
+```bash
+dotnet build
+dotnet run
+```
+
+3. O aplicativo exibirá uma mensagem indicando que está pronto para começar
+4. Pressione qualquer tecla para iniciar a gravação
+5. Fale no microfone
+6. O texto reconhecido será exibido no console
+7. Pressione Enter para parar a gravação
+
+## Solução de Problemas
+
+### Erro "Diretório do modelo não encontrado"
+
+Verifique se:
+- A pasta `model` foi criada no diretório correto
+- O conteúdo do modelo foi extraído diretamente na pasta `model`
+- O modelo foi baixado completamente
+
+### Erro ao carregar o modelo
+
+- Verifique se você tem pelo menos 512MB de RAM livre
+- Certifique-se de que o modelo foi baixado e extraído corretamente
+- Tente usar um modelo menor se o seu sistema tiver recursos limitados
+
+### Não reconhece minha fala
+
+- Verifique se o microfone está funcionando corretamente
+- Fale claramente e evite ruídos de fundo
+- Certifique-se de que está usando o modelo para o idioma correto
+- Ajuste o volume do microfone nas configurações do sistema
+
+## Próximos Passos
+
+Após testar com sucesso o reconhecimento de fala no aplicativo de console, podemos prosseguir para a implementação do sistema completo de tradução em tempo real usando React e .NET.
