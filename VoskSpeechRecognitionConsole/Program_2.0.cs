@@ -6,18 +6,18 @@ using System.Text.Json;
 using System.Threading;
 using Vosk;
 
-namespace VoskSpeechRecognitionConsole
+namespace VoskSpeechRecognitionConsole_2
 {
     class Program
     {
         // Configurações
         private static string ModelPath = "model"; // Será convertido para caminho absoluto
         private const int SampleRate = 16000; // Taxa de amostragem para o reconhecimento
-        private static string sourceLanguage = "pt-BR"; // Idioma de origem padrão
+        private static string sourceLanguage = "pt"; // Idioma de origem padrão
         private static string targetLanguage = "en"; // Idioma de destino padrão
 
 
-        static async Task Main(string[] args)
+        static async Task Main_2(string[] args)
         {
             Console.WriteLine("==== TESTE DE RECONHECIMENTO DE FALA E TRADUÇÃO ====");
             Console.WriteLine("Escolha uma opção:");
@@ -34,7 +34,7 @@ namespace VoskSpeechRecognitionConsole
                     await TestSpeechRecognition();
                     break;
                 case "2":
-                    await TranslationTest.RunTest();
+                    //await TranslationTest.RunTest();
                     break;
                 case "3":
                     await TestSpeechRecognitionWithTranslation();
@@ -131,22 +131,6 @@ namespace VoskSpeechRecognitionConsole
                     return;
                 }
             }
-
-            //if (!modelFound)
-            //{
-            //    Console.WriteLine("Modelo não encontrado nos caminhos padrão.");
-            //    Console.Write("Informe o caminho completo para o diretório do modelo: ");
-            //    string userPath = Console.ReadLine();
-
-            //    if (string.IsNullOrEmpty(userPath) || !Directory.Exists(userPath))
-            //    {
-            //        Console.WriteLine("Caminho inválido ou não informado. Encerrando programa.");
-            //        return;
-            //    }
-
-            //    ModelPath = userPath;
-            //    Console.WriteLine($"Usando caminho fornecido: {ModelPath}");
-            //}
 
             Model model = null;
             VoskRecognizer recognizer = null;
@@ -406,8 +390,8 @@ namespace VoskSpeechRecognitionConsole
                     // Traduzir o texto
                     try
                     {
-                        var translatedText = await TranslationTest.TranslateText(result.Text, sourceLanguage, targetLanguage);
-                        Console.WriteLine($"Traduzido [{targetLanguage}]: {translatedText}");
+                        //var translatedText = await TranslationTest.TranslateText(result.Text, sourceLanguage, targetLanguage);
+                        //Console.WriteLine($"Traduzido [{targetLanguage}]: {translatedText}");
                     }
                     catch (Exception ex)
                     {

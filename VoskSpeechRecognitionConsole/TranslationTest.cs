@@ -10,7 +10,8 @@ namespace VoskSpeechRecognitionConsole
     // Você pode executá-la separadamente ou integrá-la ao programa principal
     public class TranslationTest
     {
-        private const string LibreTranslateUrl = "https://libretranslate.de/translate"; // Servidor público do LibreTranslate
+        private const string LibreTranslateUrl = "http://localhost:5000/translate"; // Servidor local do LibreTranslate
+        //private const string LibreTranslateUrl = "https://libretranslate.de/translate"; // Servidor público do LibreTranslate
 
         public static async Task RunTest()
         {
@@ -18,10 +19,10 @@ namespace VoskSpeechRecognitionConsole
             Console.Write("Digite o texto a ser traduzido: ");
             string text = Console.ReadLine() ?? "Olá, mundo!";
 
-            Console.WriteLine("Idioma de origem (pt, en, es, fr, de, etc.): ");
-            string sourceLanguage = Console.ReadLine()?.ToLower() ?? "pt";
+            Console.WriteLine("Idioma de origem (pt-BR, en, es, fr, de, etc.): ");
+            string sourceLanguage = Console.ReadLine()?.ToLower() ?? "pt-BR";
 
-            Console.WriteLine("Idioma de destino (pt, en, es, fr, de, etc.): ");
+            Console.WriteLine("Idioma de destino (pt-BR, en, es, fr, de, etc.): ");
             string targetLanguage = Console.ReadLine()?.ToLower() ?? "en";
 
             try
@@ -35,12 +36,35 @@ namespace VoskSpeechRecognitionConsole
             catch (Exception ex)
             {
                 Console.WriteLine($"\nErro durante a tradução: {ex.Message}");
+
+                // Informações adicionais para diagnóstico
+                if (ex is HttpRequestException httpEx)
+                {
+                    Console.WriteLine($"Status code: {httpEx.StatusCode}");
+                    Console.WriteLine("Verifique se o Docker do LibreTranslate está rodando em: http://localhost:5000/translate");
+                    Console.WriteLine("Execute: docker run -d -p 5000:5000 libretranslate/libretranslate");
+                }
             }
         }
 
         public static async Task<string> TranslateText(string text, string sourceLanguage, string targetLanguage)
         {
             using var httpClient = new HttpClient();
+
+            // Verificar se o serviço está acessível
+            try
+            {
+                var healthCheck = await httpClient.GetAsync("http://localhost:5000/languages");
+                if (!healthCheck.IsSuccessStatusCode)
+                {
+                    throw new Exception("LibreTranslate não está acessível. Verifique se o Docker está rodando.");
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Erro ao conectar ao LibreTranslate: {ex.Message}");
+            }
+
 
             // Criar a requisição para o LibreTranslate
             var requestData = new
@@ -49,7 +73,7 @@ namespace VoskSpeechRecognitionConsole
                 source = sourceLanguage,
                 target = targetLanguage,
                 format = "text",
-                api_key = "" // Deixe vazio para servidores públicos ou coloque sua chave se tiver uma
+                //api_key = "" // Deixe vazio para servidores públicos ou coloque sua chave se tiver uma
             };
 
             var content = new StringContent(
@@ -59,6 +83,12 @@ namespace VoskSpeechRecognitionConsole
 
             var response = await httpClient.PostAsync(LibreTranslateUrl, content);
             response.EnsureSuccessStatusCode();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                throw new Exception($"Erro na API: {response.StatusCode}. Detalhes: {errorContent}");
+            }
 
             var jsonResponse = await response.Content.ReadAsStringAsync();
             var translationResult = JsonSerializer.Deserialize<TranslationResponse>(jsonResponse);

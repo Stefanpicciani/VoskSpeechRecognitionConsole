@@ -6,7 +6,7 @@ using System.Text.Json;
 using System.Threading;
 using Vosk;
 
-namespace VoskSpeechRecognitionConsoles
+namespace VoskSpeechRecognitionConsoles_1
 {
     class Program_
     {
@@ -14,7 +14,7 @@ namespace VoskSpeechRecognitionConsoles
         private static string ModelPath = "model";
         private const int SampleRate = 16000;
 
-        static void Main_(string[] args)
+        static void Main_1(string[] args)
         {
             // Obter e mostrar informações sobre os diretórios
             string currentDirectory = Directory.GetCurrentDirectory();
