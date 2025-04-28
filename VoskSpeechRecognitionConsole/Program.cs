@@ -1,5 +1,6 @@
 ﻿using NAudio.Wave;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Text.Json;
@@ -148,89 +149,269 @@ namespace VoskSpeechRecognitionConsole
             //    Console.WriteLine($"Usando caminho fornecido: {ModelPath}");
             //}
 
-            Model model = null;
-            VoskRecognizer recognizer = null;
-            WaveInEvent waveIn = null;
+            //Model model = null;
+            //VoskRecognizer recognizer = null;
+            //WaveInEvent waveIn = null;
             bool modelLoadFailed = false;
 
             try
             {
                 // Inicializa o modelo Vosk
-                Console.WriteLine("Carregando o modelo...");
-                model = new Model(ModelPath);
-                Console.WriteLine("Modelo carregado com sucesso!");
+                //Console.WriteLine("Carregando o modelo...");
+                //model = new Model(ModelPath);
+                //Console.WriteLine("Modelo carregado com sucesso!");
 
-                // Configura o reconhecedor
-                recognizer = new VoskRecognizer(model, SampleRate);
-                recognizer.SetMaxAlternatives(0);
-                recognizer.SetWords(true);
+                //// Configura o reconhecedor
+                //recognizer = new VoskRecognizer(model, SampleRate);
+                //recognizer.SetMaxAlternatives(0);
+                //recognizer.SetWords(true);
 
-                // Configura a entrada de áudio
-                Console.WriteLine("Iniciando captura de áudio do microfone...");
-                waveIn = new WaveInEvent
-                {
-                    DeviceNumber = 0, // Usa o microfone padrão
-                    WaveFormat = new WaveFormat(SampleRate, 1) // Mono, 16kHz
-                };
+                //// Configura a entrada de áudio
+                //Console.WriteLine("Iniciando captura de áudio do microfone...");
+                //waveIn = new WaveInEvent
+                //{
+                //    DeviceNumber = 0, // Usa o microfone padrão
+                //    WaveFormat = new WaveFormat(SampleRate, 16, 1) // Especificar bits por amostra (16)
+                //    //WaveFormat = new WaveFormat(SampleRate, 1) // Mono, 16kHz
+                //};
+
+                //Adicionar um trecho para listar todos os dispositivos de áudio disponíveis:
+                //for (int i = 0; i < WaveIn.DeviceCount; i++)
+                //{
+                //    var capabilities = WaveIn.GetCapabilities(i);
+                //    Console.WriteLine($"Dispositivo {i}: {capabilities.ProductName}");
+                //}
 
                 var stopRecording = new ManualResetEvent(false);
 
                 // Variável para armazenar o resultado final
                 string finalResultText = string.Empty;
 
-                waveIn.DataAvailable += (sender, e) =>
+
+                // Ajuste o formato de áudio para o formato exato que o Vosk espera
+                using (var waveIn = new WaveInEvent())
                 {
+                    waveIn.WaveFormat = new WaveFormat(16000, 16, 1);
+
+                    string tempFile = Path.Combine(Path.GetTempPath(), "temp_audio.wav");
+                    using (var writer = new WaveFileWriter(tempFile, waveIn.WaveFormat))
+                    {
+                        var manualResetEvent = new ManualResetEvent(false);
+
+                        waveIn.DataAvailable += (s, a) =>
+                        {
+                            writer.Write(a.Buffer, 0, a.BytesRecorded);
+                            Console.WriteLine($"Gravando: {a.BytesRecorded} bytes");
+                        };
+
+                        waveIn.RecordingStopped += (s, a) => manualResetEvent.Set();
+
+                        waveIn.StartRecording();
+                        Console.WriteLine("Gravando áudio... Pressione Enter para parar.");
+                        Console.ReadLine();
+                        waveIn.StopRecording();
+
+                        manualResetEvent.WaitOne();
+                    }
+
+                    // Processamento em chunks menores e verificação do arquivo
+                    Console.WriteLine("Processando arquivo gravado...");
+                    Console.WriteLine($"Arquivo salvo em: {tempFile}");
+                    Console.WriteLine($"Tamanho do arquivo: {new FileInfo(tempFile).Length} bytes");
+
                     try
                     {
-                        // Converte PCM para 16-bit
-                        if (recognizer.AcceptWaveform(e.Buffer, e.BytesRecorded))
+                        // Vamos ler o arquivo como PCM puro, não como arquivo WAV completo
+                        using (var audioFile = new AudioFileReader(tempFile))
                         {
-                            var result = recognizer.Result();
-                            finalResultText = result; // Armazena o último resultado completo
-                            ProcessResult(result);
-                        }
-                        else
-                        {
-                            var partialResult = recognizer.PartialResult();
-                            ProcessPartialResult(partialResult);
+                            Console.WriteLine($"Formato do arquivo: {audioFile.WaveFormat}");
+
+                            // Criar o modelo e o reconhecedor
+                            using (var model = new Model(ModelPath))
+                            using (var recognizer = new VoskRecognizer(model, 16000.0f))
+                            {
+                                recognizer.SetMaxAlternatives(0);
+
+                                // Buffer para leitura
+                                byte[] buffer = new byte[4096];
+                                int bytesRead;
+
+                                // Pular o cabeçalho WAV - o Vosk espera PCM puro
+                                using (var reader = new BinaryReader(File.OpenRead(tempFile)))
+                                {
+                                    // Verificar se é um arquivo WAV
+                                    if (new string(reader.ReadChars(4)) == "RIFF")
+                                    {
+                                        reader.BaseStream.Position = 44; // Pular o cabeçalho WAV
+                                        Console.WriteLine("Cabeçalho WAV detectado e ignorado.");
+
+                                        // Leia o resto do arquivo
+                                        byte[] pcmData = new byte[reader.BaseStream.Length - 44];
+                                        reader.Read(pcmData, 0, pcmData.Length);
+
+                                        // Processar os dados PCM
+                                        bool accepted = recognizer.AcceptWaveform(pcmData, pcmData.Length);
+                                        Console.WriteLine($"Dados aceitos: {accepted}");
+
+                                        string result = recognizer.FinalResult();
+                                        Console.WriteLine($"Resultado final: {result}");
+
+                                        var resultObj = System.Text.Json.JsonSerializer.Deserialize<VoskResult>(result);
+                                        Console.WriteLine($"Texto reconhecido: '{resultObj?.Text ?? "nada reconhecido"}'");
+                                    }
+                                    else
+                                    {
+                                        Console.WriteLine("O arquivo não parece ser um WAV válido.");
+                                    }
+                                }
+                            }
                         }
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Erro durante reconhecimento: {ex.Message}");
+                        Console.WriteLine($"Erro ao processar arquivo: {ex.Message}");
+                        Console.WriteLine(ex.StackTrace);
                     }
-                };
-
-                waveIn.RecordingStopped += (sender, e) =>
-                {
-                    stopRecording.Set();
-                };
-
-                // Inicia a gravação
-                waveIn.StartRecording();
-                Console.WriteLine("Gravação iniciada! Fale alguma coisa...");
-                Console.WriteLine("Pressione Enter para parar a gravação");
-
-                Console.ReadLine();
-
-                // Para a gravação
-                waveIn.StopRecording();
-                Console.WriteLine("Processando resultados finais...");
-
-                // Evitamos chamar FinalResult() diretamente para evitar o erro
-                // Em vez disso, usamos o último resultado armazenado
-                if (!string.IsNullOrEmpty(finalResultText))
-                {
-                    Console.WriteLine("Usando o último resultado capturado:");
-                    ProcessResult(finalResultText);
-                }
-                else
-                {
-                    Console.WriteLine("Nenhum resultado final disponível.");
                 }
 
-                Console.WriteLine("Reconhecimento concluído!");
-            }
+
+        // Primeiro grave o áudio em um arquivo
+        //using (var waveIn = new WaveInEvent())
+        //{
+        //    waveIn.WaveFormat = new WaveFormat(16000, 16, 1);
+
+        //    string tempFile = Path.Combine(Path.GetTempPath(), "temp_audio.wav");
+        //    using (var writer = new WaveFileWriter(tempFile, waveIn.WaveFormat))
+        //    {
+        //        var manualResetEvent = new ManualResetEvent(false);
+
+        //        waveIn.DataAvailable += (s, a) =>
+        //        {
+        //            writer.Write(a.Buffer, 0, a.BytesRecorded);
+        //            Console.WriteLine($"Gravando: {a.BytesRecorded} bytes");
+        //        };
+
+        //        waveIn.RecordingStopped += (s, a) => manualResetEvent.Set();
+
+        //        waveIn.StartRecording();
+        //        Console.WriteLine("Gravando áudio... Pressione Enter para parar.");
+        //        Console.ReadLine();
+        //        waveIn.StopRecording();
+
+        //        manualResetEvent.WaitOne();
+        //    }
+
+        //    // Depois processe o arquivo
+        //    Console.WriteLine("Processando arquivo gravado...");
+        //    try
+        //    {
+        //        byte[] audioData = File.ReadAllBytes(tempFile);
+        //        using (var model = new Model(ModelPath))
+        //        using (var recognizer = new VoskRecognizer(model, 16000))
+        //        {
+        //            recognizer.SetMaxAlternatives(0);
+        //            recognizer.AcceptWaveform(audioData, audioData.Length);
+        //            var result = recognizer.FinalResult();
+        //            Console.WriteLine($"Resultado: {result}");
+        //        }
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        Console.WriteLine($"Erro ao processar arquivo: {ex.Message}");
+        //    }
+        //}
+
+        //waveIn.DataAvailable += (sender, e) =>
+        //{
+        //    try
+        //    {
+        //        Console.WriteLine($"Dados recebidos: {e.BytesRecorded} bytes");
+
+        //        // Converte PCM para 16-bit
+        //        if (recognizer.AcceptWaveform(e.Buffer, e.BytesRecorded))
+        //        {
+        //            var result = recognizer.Result();
+        //            finalResultText = result; // Armazena o último resultado completo
+        //            ProcessResult(result);
+        //        }
+        //        else
+        //        {
+        //            var partialResult = recognizer.PartialResult();
+        //            ProcessPartialResult(partialResult);
+        //        }
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        Console.WriteLine($"Erro durante reconhecimento: {ex.Message}");
+        //    }
+        //};
+
+
+        //waveIn.DataAvailable += (sender, e) =>
+        //{
+        //    try
+        //    {
+        //        // Converter para 16-bit se necessário
+        //        byte[] convertedBuffer;
+        //        if (waveIn.WaveFormat.BitsPerSample != 16 || waveIn.WaveFormat.SampleRate != SampleRate)
+        //        {
+        //            using (var sourceProvider = new RawSourceWaveStream(
+        //                new MemoryStream(e.Buffer, 0, e.BytesRecorded), waveIn.WaveFormat))
+        //            using (var convertedStream = new MemoryStream())
+        //            {
+        //                var wav16Provider = new WaveFormatConversionStream(
+        //                    new WaveFormat(SampleRate, 16, 1), sourceProvider);
+        //                WaveFileWriter.WriteWavFileToStream(convertedStream, wav16Provider);
+        //                convertedBuffer = convertedStream.ToArray();
+        //            }
+        //        }
+        //        else
+        //        {
+        //            convertedBuffer = e.Buffer;
+        //        }
+
+        //        if (recognizer.AcceptWaveform(convertedBuffer, convertedBuffer.Length))
+        //        {
+        //            // Processamento do resultado...
+        //        }
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        Console.WriteLine($"Erro: {ex.Message}");
+        //    }
+        //};
+
+
+        //waveIn.RecordingStopped += (sender, e) =>
+        //{
+        //    stopRecording.Set();
+        //};
+
+        //// Inicia a gravação
+        //waveIn.StartRecording();
+        //Console.WriteLine("Gravação iniciada! Fale alguma coisa...");
+        //Console.WriteLine("Pressione Enter para parar a gravação");
+
+        //Console.ReadLine();
+
+        //// Para a gravação
+        //waveIn.StopRecording();
+        //Console.WriteLine("Processando resultados finais...");
+
+        //// Evitamos chamar FinalResult() diretamente para evitar o erro
+        //// Em vez disso, usamos o último resultado armazenado
+        //if (!string.IsNullOrEmpty(finalResultText))
+        //{
+        //    Console.WriteLine("Usando o último resultado capturado:");
+        //    ProcessResult(finalResultText);
+        //}
+        //else
+        //{
+        //    Console.WriteLine("Nenhum resultado final disponível.");
+        //}
+
+        //Console.WriteLine("Reconhecimento concluído!");
+    }
             catch (Exception ex)
             {
                 Console.WriteLine($"Erro: {ex.Message}");
@@ -240,21 +421,21 @@ namespace VoskSpeechRecognitionConsole
             finally
             {
                 // Liberação explícita de recursos
-                if (waveIn != null)
-                {
-                    try { waveIn.StopRecording(); } catch { }
-                    waveIn.Dispose();
-                }
+                //if (waveIn != null)
+                //{
+                //    try { waveIn.StopRecording(); } catch { }
+                //    waveIn.Dispose();
+                //}
 
-                if (recognizer != null && !modelLoadFailed)
-                {
-                    try { recognizer.Dispose(); } catch { }
-                }
+                //if (recognizer != null && !modelLoadFailed)
+                //{
+                //    try { recognizer.Dispose(); } catch { }
+                //}
 
-                if (model != null && !modelLoadFailed)
-                {
-                    try { model.Dispose(); } catch { }
-                }
+                //if (model != null && !modelLoadFailed)
+                //{
+                //    try { model.Dispose(); } catch { }
+                //}
 
                 // Força a coleta de lixo para liberar recursos
                 GC.Collect();
